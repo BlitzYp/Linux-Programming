@@ -1,0 +1,129 @@
+MD3
+Mērķi
+
+    Direktorijas koka rekursīva apstaigāšana
+    Failu parametru nolasīšana un analīze
+    Darbs ar stat(), opendir(),readdir(),closedir()
+    Hash tabulas pielietojumi
+    MD5 pielietojums
+
+
+Uzdevums
+
+Uzrakstīt programmu md3, kas apstaigā direktoriju koku un atrod tos failus kas ir duplikāti, respektīvi, atrodami vairākos eksemplāros.
+
+Apstaigāšana jāsāk no tās direktorijas, kurā programma izpildās (t.i. direktorijas ar nosaukumu ".").
+
+Faili tiek uzskatīti par vienādiem, ja tiem ir vienāds izmērs un faila vārds, izņemot MD5 režīmā, kad failu vienādību nosaka MD5 vērtības.
+
+Saites (symbolic links, t.i. "vājās" saites) jāignorē. Divas vājās saites, vai arī fails un vājā saite uz to nav jāsalīdzina.
+
+Vārds un izmērs jāpārbauda vienmēr, izņemot MD5 režīmu. Papildus pārbaudes nosaka parametri:
+
+md3 -d      pārbauda arī faila satura izmaiņu datumu (st_mtime) sakritību
+md3 -m      aprēķina un salīdzina MD5 vērtību faila saturam (bez vārda un datuma). 
+md3 -h      izvada palīga tekstu par parametriem
+
+Izdrukas formāts (uz stdout):
+
+=== date size filename1 [MD5]
+path1/filename1 
+path2/filename1 
+...
+
+=== date size filename2 [MD5]
+path1/filename2 
+path2/filename2 
+...
+
+Datuma formāts ir tāds pat kā ls -l: (yyyy-mm-dd hh:mm). Piemēram: 2010-09-25 21:45
+
+MD5 jādrukā tikai tad, ja pie programmas izsaukuma parametrs bija -m. MD5 drukājams kā heksadecimālu simbolu virkne bez tukšumiem.
+
+Šajā gadījumā failu vienādību nosaka tikai MD5 sakritība, un izvads var nedaudz atšķirties - jo vienādiem failiem var atšķirties to vārdi un satura izmaiņu datumi. Datums izvadāms tikai vienam failam.
+
+=== date size filename1 [MD5]
+path1/filename1 
+path2/filename2 
+path3/filename3 
+...
+
+Jāiesniedz
+
+Darbs jāiesniedz kursa serverī, direktorijā md_dir
+
+Jāiesniedz sekojoši faili:
+
+    md_dir.c - C programmas pirmkods.
+    Makefile
+    apraksts.pdf īss apraksts un atbildes uz jautājumiem. nepieciešamības gadījumā dokumentā var iekļaut ekrānšāviņus.
+
+Vērtējums
+
+Uzdevums tiks vērtēts sekojoši:
+
+    60% - Korekta programmas darbība salīdzinot tikai failu vārdus un izmērus
+    10% - -d datuma salīdzināšanas opcijas realizācija
+    20% - -m opcijas realizācija
+    10% - -h realizācija
+
+Piemēri
+
+Darbinām md3, salīdzinām arī datumus, izvadam rezultātus log failā.
+
+md3 -d > log
+
+Salīdzinām failus tikai pēc vārdiem un izmēriem
+
+md3
+
+Salīdzinām failus pēc vārdiem un izmaiņu datumiem
+
+md3 -d
+
+Salīdzinām failus pēc satura
+
+md3 -m
+
+Salīdzinām failus pēc satura, vārdiem un datumiem. Izvadam tikai tos, kam visi vienādi.
+
+md3 -d -m
+
+Derīga informācija
+
+    stat()
+    opendir(), readdir(), closedir()
+    Hash funkcijas un tabulas piemērs
+    MD5
+
+
+    Drīkst lietot gatavu MD5 implementāciju, piemēram, no libcrytpo. Lai varetu izmantot "openssl/md5.h" jums jāinstallē:
+
+sudo apt-get install libssl-dev
+
+Un saišu redaktoram jānorāda attiecīgā bibliotēka (-lcrypto):
+
+gcc -Wall -o md5 md5.c -lcrypto
+
+    Ieteikums: izstrādājiet programmatūru pakāpeniski. Piemēram, vispirms ielasiet un izdrukājiet datus. Tad pievienojiet datu analīzi un reģistrēšanu savās datu struktūrās. Tad pievienojiet datu analīzi lai tos sakārtotu izdrukai. Testējiet vispirms uz pareiziem datiem. tad uz kļūdainiem datiem.
+
+J&A (jautājumi un atbildes)
+J: Uzdevums pārāk grūts, vai var pagarināt termiņu?
+
+A: Noteiktais termiņš paliek spēkā. Iesaku risināt savlaicīgi, lai pietiek laika neparedzētu problēmu risināšanai.
+J: Vai jāignorē gan "soft", gan "hard" saites?
+
+A: Vājās saites (soft links) jāignorē. Stingrās saites (hard links) nav jāignorē. Lielākā daļa failu, ko mēs ikdienā redzam savās direktorijās ir cietās saites uz failu i-node struktūrām. Tāpēc ignorējot arī stingrās saites mēs ignorētu praktiski visus failus.
+J: Vai drukājot ārā ceļu uz duplikāt-failu ir nepieciešams likt klāt "./"
+
+=== 2014-10-04 18:11 509 ATest.c
+./my_dir4/ATest.c
+./ATest.c
+
+vai
+
+=== 2014-10-04 18:11 509 ATest.c
+my_dir4/ATest.c
+ATest.c
+
+A: "./" priekšā nav jāliek, tātad pareizs ir otrais variants 
