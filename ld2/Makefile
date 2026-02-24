@@ -4,7 +4,6 @@ all:
 test:
 	./pd2 test.in test.out
 	cmp test.out test.in && echo "Strādā!" || echo "Atšķiras!"
-
 test_big:
 	./pd2 test-big.in test.out
 	cmp test.out test-big.in && echo "Strādā!" || echo "Atšķiras!"
