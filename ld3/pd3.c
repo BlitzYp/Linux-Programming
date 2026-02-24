@@ -4,7 +4,6 @@
 #include <sys/stat.h>
 #include <stdbool.h>
 #include <string.h>
-
 #define MAX_PATH 256
 
 static void die_error(const char* msg)
