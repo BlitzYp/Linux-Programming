@@ -7,6 +7,7 @@
 #include <string.h>
 #include <openssl/md5.h>
 #include <unistd.h>
+#include <time.h>
 #define MAX_PATH 4096
 
 typedef struct Config {
@@ -56,7 +57,7 @@ typedef struct HashTable {
 static void die_error(const char* msg);
 static bool is_dir(const char* path); 
 static void dfs(const char* path,HashTable* hash_table);
-static int md5_file(File* f);
+static void md5_file(File* f);
 static void md5_hex(const unsigned char md5[16],char* o);
 static File* create_file(const char* path, const struct stat* st);
 static void free_file(File* f);
@@ -65,6 +66,7 @@ static void push_file_vector(Vector* v,File* f);
 static void free_vector(Vector* v);
 static HashTable* create_hash_table();
 static void hash_table_insert_file(HashTable* hash_table,File* f);
+static unsigned long get_hash(const char* name, off_t size, time_t mtime, const unsigned char md5[16], bool md5_ready);
 static unsigned long get_file_hash(File* f);
 static unsigned long get_group_hash(Group* g);
 static unsigned long hash(const char* s);
@@ -92,12 +94,27 @@ int main(int argc,char** argv)
         else if (strcmp(argv[i],"-h")==0) cfg.use_help=true;
         else die_error("INVALID ARGUMENT");
     }
-    char cwd[MAX_PATH];
-    getcwd(cwd,MAX_PATH);
     HashTable* hash_table=create_hash_table();
     groups=create_group_vector(1024);
-    dfs(cwd,hash_table);
-    print_groups();
+    dfs(".",hash_table);
+    //print_groups();
+    for (size_t i=0;i<groups->len;i++) {
+        Group* g=groups->elements[i];
+        if (g->files.len>=2) {
+            char date[17],md5[33];
+            format_time(g->mtime,date);
+            md5_hex(g->md5,md5);
+            if (cfg.use_md5) {
+                md5_hex(g->md5,md5);
+                fprintf(stdout,"=== %s %d %s %s\n",date,g->size,g->files.elements[0]->name,md5);
+            } 
+            else fprintf(stdout,"=== %s %d %s\n",date,g->size,g->files.elements[0]->name);
+            for (size_t j=0;j<g->files.len;j++) {
+                File* f=g->files.elements[j];
+                fprintf(stdout,"%s\n",f->path);
+            }
+        }
+    }
     free_group_vector(groups);
     free_hash_table(hash_table);
     return 0;
@@ -110,13 +127,22 @@ static void die_error(const char* msg)
     exit(-1);
 }
 
+//"yyyy-mm-dd hh:mm"
+static void format_time(time_t t,char* out) 
+{
+    struct tm* tm_buff;
+    tm_buff=localtime(&t);
+    if (!tm_buff) die_error("Failed to format time!");
+    strftime(out,17,"%Y-%m-%d %H:%M",tm_buff);
+}
+
 static void print_groups() 
 {
     for (int i=0;i<groups->len;i++) {
         Group* g=groups->elements[i];
         printf("------------------------------------\n");
         fprintf(stdout,"Name for the group: %s, size: %jd\n",g->name,g->size);
-        fprintf(stdout,"Nr. of files in group for group %s: %d\n",g->name,g->files.len);
+        fprintf(stdout,"Nr. of files in group %s: %ld\n",g->name,g->files.len);
     }
 }
 
@@ -124,6 +150,41 @@ static void sv_kopet(char *no, char *uz)
 {
     for (; *no != '\0'; no++, uz++) *uz = *no;
     *uz = '\0';
+}
+
+static void md5_file(File *f)
+{
+    FILE* file=fopen(f->path, "rb");
+    if (!file) die_error("Error with md5 creation");
+    MD5_CTX ctx;
+    unsigned char buf[4096];
+    size_t n;
+    if (MD5_Init(&ctx) != 1) {
+        fclose(file);
+        die_error("Error with md5 creation");
+    }
+    while ((n=fread(buf, 1,sizeof(buf),file))>0) {
+        if (MD5_Update(&ctx, buf, n) != 1) {
+            fclose(file);
+            die_error("Error with md5 creation");
+        }
+    }
+    if (MD5_Final(f->md5,&ctx)!=1) {
+        fclose(file);
+        die_error("Error with md5 creation");
+    }
+    fclose(file);
+    f->md5_ready=true;
+}
+
+static void md5_hex(const unsigned char md5[16], char *out)
+{
+    static const char hex[]="0123456789abcdef";
+    for (int i=0;i<16;i++) {
+        out[i*2]=hex[(md5[i]>>4)&0x0F];
+        out[i*2+1]=hex[md5[i]&0x0F];
+    }
+    out[32]='\0';
 }
 
 static unsigned long hash_bytes(const unsigned char* data, size_t len)
@@ -155,7 +216,7 @@ static bool file_in_group(const Group* g, const File* f)
     if (cfg.use_md5) {
         if (!f->md5_ready) return false;
         if (memcmp(g->md5, f->md5, sizeof(f->md5)) != 0) return false;
-        if (cfg.use_date && g->mtime != f->mtime) return false;
+        if (cfg.use_date&&g->mtime!=f->mtime) return false;
         return true;
     }
 
@@ -319,7 +380,6 @@ static Group* create_new_group(File* f)
     g->mtime=f->mtime;
     memcpy(g->md5, f->md5, sizeof(g->md5));
     g->next_group = NULL;
-
     if (!cfg.use_md5&&f->name) {
         g->name=strdup(f->name);
         //sv_kopet(f->name,g->name);
@@ -328,7 +388,6 @@ static Group* create_new_group(File* f)
             die_error("strdup group name");
         }
     }
-
     push_file_vector(&g->files, f);
     push_group_vector(groups,g);
     return g;
@@ -348,7 +407,6 @@ static void free_group(Group* g)
 static void free_hash_table(HashTable* hash_table)
 {
     if (!hash_table) return;
-
     for (size_t i = 0; i < hash_table->size; i++) {
         Group* g = hash_table->groups[i];
         while (g) {
@@ -364,40 +422,31 @@ static void free_hash_table(HashTable* hash_table)
     free(hash_table);
 }
 
+static unsigned long get_hash(const char* name, off_t size, time_t mtime, const unsigned char md5[16], bool md5_ready)
+{
+    unsigned long h=1469598103934665603UL;
+    if (cfg.use_md5) {
+        if (md5_ready) h=mix_hash(h,hash_bytes(md5,16));
+        if (cfg.use_date) h=mix_hash(h,(unsigned long)mtime);
+        return h;
+    }
+    h=mix_hash(h,hash(name));
+    h=mix_hash(h,(unsigned long)size);
+    if (cfg.use_date) h=mix_hash(h,(unsigned long)mtime);
+    return h;
+}
+
 static unsigned long get_file_hash(File* f)
 {
     if (!f) return 0;
-
-    unsigned long h=1469598103934665603UL;
-
-    if (cfg.use_md5) {
-        if (f->md5_ready) h=mix_hash(h,hash_bytes(f->md5, sizeof(f->md5)));
-        if (cfg.use_date) h=mix_hash(h,(unsigned long)f->mtime);
-        return h;
-    }
-
-    h=mix_hash(h,hash(f->name));
-    h=mix_hash(h,(unsigned long)f->size);
-    if (cfg.use_date) h=mix_hash(h,(unsigned long)f->mtime);
-    return h;
+    return get_hash(f->name,f->size,f->mtime,f->md5,f->md5_ready);
 }
+
 
 static unsigned long get_group_hash(Group* g)
 {
     if (!g) return 0;
-
-    unsigned long h=1469598103934665603UL;
-
-    if (cfg.use_md5) {
-        h = mix_hash(h, hash_bytes(g->md5, sizeof(g->md5)));
-        if (cfg.use_date) h = mix_hash(h,(unsigned long)g->mtime);
-        return h;
-    }
-
-    h=mix_hash(h,hash(g->name));
-    h=mix_hash(h,(unsigned long)g->size);
-    if (cfg.use_date) h=mix_hash(h,(unsigned long)g->mtime);
-    return h;
+    return get_hash(g->name,g->size,g->mtime,g->md5,true);
 }
 
 static void hash_table_insert_file(HashTable* hash_table,File* f)
@@ -422,7 +471,7 @@ static void hash_table_insert_file(HashTable* hash_table,File* f)
     hash_table->count++;
 }
 
-// Koda fragments no ld3
+// Daļa no ld3
 static void dfs(const char* path,HashTable* hash_table)
 {
     char abs_path[MAX_PATH];
@@ -432,13 +481,13 @@ static void dfs(const char* path,HashTable* hash_table)
     struct dirent* entry;
     while ((entry=readdir(dir))!=NULL) {
         if (strcmp(entry->d_name,".")==0||strcmp(entry->d_name,"..")==0) continue;
-
         size_t l=strlen(path);
         int n;
+
         if (l>0&&path[l-1]=='/') n = snprintf(abs_path,sizeof(abs_path),"%s%s",path,entry->d_name);
+        else if (strcmp(path,".")==0) n=snprintf(abs_path,sizeof(abs_path),"%s",entry->d_name);
         else n = snprintf(abs_path,sizeof(abs_path),"%s/%s",path,entry->d_name);
         if (n < 0 || (size_t)n >= sizeof(abs_path)) continue;
-
         if (is_dir(abs_path)) {
             dfs(abs_path,hash_table);
             continue;
@@ -448,7 +497,8 @@ static void dfs(const char* path,HashTable* hash_table)
         // Is file?
         if (S_ISREG(st.st_mode)) {
             File* f=create_file(abs_path, &st);
-            puts(f->path);
+            //puts(f->path);
+            if (cfg.use_md5) md5_file(f);
             if (f) hash_table_insert_file(hash_table,f);
         }
     }
