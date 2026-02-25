@@ -1,3 +1,6 @@
+// for C99
+#define _POSIX_C_SOURCE 200809L
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <dirent.h>
@@ -104,6 +107,7 @@ int main(int argc,char** argv)
             char date[17],md5[33];
             format_time(g->mtime,date);
             md5_hex(g->md5,md5);
+            // === date size filename1 [MD5]
             if (cfg.use_md5) {
                 md5_hex(g->md5,md5);
                 fprintf(stdout,"=== %s %d %s %s\n",date,g->size,g->files.elements[0]->name,md5);
@@ -189,10 +193,10 @@ static void md5_hex(const unsigned char md5[16], char *out)
 
 static unsigned long hash_bytes(const unsigned char* data, size_t len)
 {
-    unsigned long h = 1469598103934665603UL; // FNV-like start (fits unsigned long on 64-bit)
-    for (size_t i = 0; i < len; i++) {
-        h ^= (unsigned long)data[i];
-        h *= 1099511628211UL;
+    unsigned long h=1469598103934665603UL; // FNV-like start (fits unsigned long on 64-bit)
+    for (size_t i=0;i<len;i++) {
+        h^=(unsigned long)data[i];
+        h*=1099511628211UL;
     }
     return h;
 }
@@ -272,7 +276,7 @@ static Vector_Group* create_group_vector(size_t cap)
     v->cap=cap;
     v->elements=NULL;
     if (cap>0) {
-        v->elements=malloc(cap * sizeof(Group*));
+        v->elements=malloc(cap*sizeof(Group*));
         if (!v->elements) {
             free(v);
             die_error("malloc Vector_Group elements");
@@ -298,7 +302,7 @@ static void free_group_vector(Vector_Group* v)
 {
     if (!v) return;
     free(v->elements);
-    v->elements = NULL;
+    v->elements=NULL;
     v->len = 0;
     v->cap = 0;
     free(v);
@@ -325,25 +329,31 @@ static File* create_file(const char* path, const struct stat* st)
     f->mtime=st->st_mtime;
     f->md5_ready=false;
     memset(f->md5,0,sizeof(f->md5));
-    f->path = strdup(path);
+    //f->path = strdup(path);
+    size_t l=strlen(path);
+    f->path=malloc(l+1);
     if (!f->path) {
         free(f);
-        die_error("Failed strdup file path");
+        die_error("Failed allocation file path");
     }
+    sv_kopet(path,f->path);
     const char* base=strrchr(path, '/');
     base=base ? base + 1 : path;
-    f->name=strdup(base);
+    //f->name=strdup(base);
+    l=strlen(base);
+    f->name=malloc(l+1);
     if (!f->name) {
         free(f->path);
         free(f);
-        die_error("Failed strdup file name");
+        die_error("Failed allocation file name");
     }
+    sv_kopet(base,f->name);
     return f;
 }
 
 static void free_file(File* f)
 {
-    if (!f) die_error("Null file pointer");
+    if (!f) return;
     free(f->path);
     free(f->name);
     f->path=NULL;
@@ -371,22 +381,23 @@ static Group* create_new_group(File* f)
     if (!f) return NULL;
     Group* g=malloc(sizeof(Group));
     if (!g) die_error("malloc Group");
-
     g->files.elements=NULL;
     g->files.len=0;
     g->files.cap=0;
     g->name=NULL;
     g->size=f->size;
     g->mtime=f->mtime;
-    memcpy(g->md5, f->md5, sizeof(g->md5));
-    g->next_group = NULL;
+    memcpy(g->md5,f->md5,sizeof(g->md5));
+    g->next_group=NULL;
     if (!cfg.use_md5&&f->name) {
-        g->name=strdup(f->name);
-        //sv_kopet(f->name,g->name);
+        //g->name=strdup(f->name);
+        size_t l=strlen(f->name);
+        g->name=malloc(l+1);
         if (!g->name) {
             free(g);
-            die_error("strdup group name");
+            die_error("Failed allocation group name");
         }
+        sv_kopet(f->name,g->name);
     }
     push_file_vector(&g->files, f);
     push_group_vector(groups,g);
@@ -397,18 +408,19 @@ static void free_group(Group* g)
 {
     if (!g) return;
     free(g->name);
-    free(g->files.elements); // group does not own File objects
-    g->files.elements = NULL;
-    g->files.len = 0;
-    g->files.cap = 0;
+    for (size_t i=0;i<g->files.len;i++) free_file(g->files.elements[i]);
+    free(g->files.elements); 
+    g->files.elements=NULL;
+    g->files.len=0;
+    g->files.cap=0;
     free(g);
 }
 
 static void free_hash_table(HashTable* hash_table)
 {
     if (!hash_table) return;
-    for (size_t i = 0; i < hash_table->size; i++) {
-        Group* g = hash_table->groups[i];
+    for (size_t i=0;i<hash_table->size;i++) {
+        Group* g=hash_table->groups[i];
         while (g) {
             Group* next = g->next_group;
             free_group(g);
@@ -493,13 +505,16 @@ static void dfs(const char* path,HashTable* hash_table)
             continue;
         }
         struct stat st;
-        lstat(abs_path,&st);
+        if (lstat(abs_path,&st)<0) die_error("Failed lstat");
+        if (S_ISLNK(st.st_mode)) continue;
         // Is file?
         if (S_ISREG(st.st_mode)) {
             File* f=create_file(abs_path, &st);
             //puts(f->path);
-            if (cfg.use_md5) md5_file(f);
-            if (f) hash_table_insert_file(hash_table,f);
+            if (f) {
+                if (cfg.use_md5) md5_file(f);
+                hash_table_insert_file(hash_table,f);
+            }
         }
     }
     closedir(dir);

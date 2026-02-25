@@ -1,5 +1,5 @@
 CC := gcc
-CFLAGS := -Wall
+CFLAGS := -std=c99
 LDLIBS := -lcrypto
 
 BIN := md_dir
