@@ -1,0 +1,2 @@
+Svarīgs pieņēmums: Izpildot ./md_dir bez -d flaga, tāpat tiek izprintēts datums, ja bija jāprintē tikai vārds un izmērs, tad to var viegli salabot ar vienu if main funkcijā
+Priekš hash funkcijas izmantoju FNV-1a. 

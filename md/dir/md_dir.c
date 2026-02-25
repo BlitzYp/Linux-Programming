@@ -225,6 +225,7 @@ static void md5_hex(const unsigned char md5[16], char *out)
     out[32]='\0';
 }
 
+// FNV-1a hash
 static unsigned long hash_bytes(const unsigned char* data, size_t len)
 {
     unsigned long h=HASH_FNV_OFFSET_BASIS; 
