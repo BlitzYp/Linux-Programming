@@ -12,6 +12,9 @@
 #include <unistd.h>
 #include <time.h>
 #define MAX_PATH 4096
+#define HASH_FNV_OFFSET_BASIS 1469598103934665603UL
+#define HASH_FNV_PRIME 1099511628211UL
+#define HASH_COMBINE_GOLDEN 0x9e3779b97f4a7c15UL
 
 typedef struct Config {
     bool use_date;
@@ -64,9 +67,8 @@ static void md5_file(File* f);
 static void md5_hex(const unsigned char md5[16],char* o);
 static File* create_file(const char* path, const struct stat* st);
 static void free_file(File* f);
-static Vector* create_vector(int n);
+//static Vector* create_vector(int n);
 static void push_file_vector(Vector* v,File* f);
-static void free_vector(Vector* v);
 static HashTable* create_hash_table();
 static void hash_table_insert_file(HashTable* hash_table,File* f);
 static unsigned long get_hash(const char* name, off_t size, time_t mtime, const unsigned char md5[16], bool md5_ready);
@@ -76,13 +78,14 @@ static unsigned long hash(const char* s);
 static unsigned long mix_hash(unsigned long h, unsigned long x);
 static void free_hash_table(HashTable* hash_table);
 static Group* create_new_group(File* f);
-static void print_group(Group* g);
+//static void print_groups();
 static void free_group(Group* g);
 static void format_time(time_t t,char* out); // "yyyy-mm-dd hh:mm"
-static void sv_kopet(char *no, char *uz);
+static void sv_kopet(const char *no, char *uz);
 static Vector_Group* create_group_vector(size_t cap);
 static void push_group_vector(Vector_Group* v,Group* g);
 static void free_group_vector(Vector_Group* v);
+static void print_help(const char* exec);
 
 // Global config for flags: date,md5,help
 Config cfg={false,false,false};
@@ -97,27 +100,33 @@ int main(int argc,char** argv)
         else if (strcmp(argv[i],"-h")==0) cfg.use_help=true;
         else die_error("INVALID ARGUMENT");
     }
+    if (cfg.use_help) {
+        print_help(argv[0]);
+        return 0;
+    }
     HashTable* hash_table=create_hash_table();
     groups=create_group_vector(1024);
     dfs(".",hash_table);
     //print_groups();
+    bool first=true;
     for (size_t i=0;i<groups->len;i++) {
         Group* g=groups->elements[i];
         if (g->files.len>=2) {
+            if (first) first=false;
+            else fprintf(stdout,"\n");
             char date[17],md5[33];
             format_time(g->mtime,date);
             md5_hex(g->md5,md5);
             // === date size filename1 [MD5]
             if (cfg.use_md5) {
                 md5_hex(g->md5,md5);
-                fprintf(stdout,"=== %s %d %s %s\n",date,g->size,g->files.elements[0]->name,md5);
+                fprintf(stdout,"=== %s %ld %s %s\n",date,g->size,g->files.elements[0]->name,md5);
             } 
-            else fprintf(stdout,"=== %s %d %s\n",date,g->size,g->files.elements[0]->name);
+            else fprintf(stdout,"=== %s %ld %s\n",date,g->size,g->files.elements[0]->name);
             for (size_t j=0;j<g->files.len;j++) {
                 File* f=g->files.elements[j];
                 fprintf(stdout,"%s\n",f->path);
             }
-            fprintf(stdout,"\n");
         }
     }
     free_group_vector(groups);
@@ -132,6 +141,28 @@ static void die_error(const char* msg)
     exit(-1);
 }
 
+static void print_help(const char* exec) 
+{
+    fprintf(stdout,"============================================\n");
+    fprintf(stdout,"Usage: %s [-d] [-m] [-h]\n",exec);
+    fprintf(stdout,"Program finds duplicate files based on default and given paramaters starting from '.'\n");
+    fprintf(stdout,"============================================\n");
+    fprintf(stdout,"Output format: \n");
+    fprintf(stdout,"=== date size filename1 [MD5]\npath1/filename1\npath2/filename1\n");
+    fprintf(stdout,"============================================\n");
+    fprintf(stdout,"Default: match for duplicates with same filename and size\n");
+    fprintf(stdout,"Options:\n");
+    fprintf(stdout,"  -h  prints information about the usage of this program\n");
+    fprintf(stdout,"  -d  also compares modification time (st_mtime)\n");
+    fprintf(stdout,"  -m  compare files using only MD5\n");
+    fprintf(stdout,"  -m -d  compare files based on filename,modification time and md5\n");
+    fprintf(stdout,"============================================\n");
+    fprintf(stdout,"Exit status:\n");
+    fprintf(stdout,"  0: if everything executed ok,\n");
+    fprintf(stdout," -1: if an error occured.\n");
+    fprintf(stdout,"============================================\n");
+}
+
 //"yyyy-mm-dd hh:mm"
 static void format_time(time_t t,char* out) 
 {
@@ -141,20 +172,22 @@ static void format_time(time_t t,char* out)
     strftime(out,17,"%Y-%m-%d %H:%M",tm_buff);
 }
 
+/*
 static void print_groups() 
 {
-    for (int i=0;i<groups->len;i++) {
+    for (size_t i=0;i<groups->len;i++) {
         Group* g=groups->elements[i];
         printf("------------------------------------\n");
         fprintf(stdout,"Name for the group: %s, size: %jd\n",g->name,g->size);
         fprintf(stdout,"Nr. of files in group %s: %ld\n",g->name,g->files.len);
     }
 }
+*/
 
-static void sv_kopet(char *no, char *uz)
+static void sv_kopet(const char *no, char *uz)
 {
-    for (; *no != '\0'; no++, uz++) *uz = *no;
-    *uz = '\0';
+    for (;*no!='\0';no++,uz++) *uz=*no;
+    *uz='\0';
 }
 
 static void md5_file(File *f)
@@ -194,10 +227,10 @@ static void md5_hex(const unsigned char md5[16], char *out)
 
 static unsigned long hash_bytes(const unsigned char* data, size_t len)
 {
-    unsigned long h=1469598103934665603UL; // FNV-like start (fits unsigned long on 64-bit)
+    unsigned long h=HASH_FNV_OFFSET_BASIS; 
     for (size_t i=0;i<len;i++) {
         h^=(unsigned long)data[i];
-        h*=1099511628211UL;
+        h*=HASH_FNV_PRIME;
     }
     return h;
 }
@@ -210,13 +243,13 @@ static unsigned long hash(const char* s)
 
 static unsigned long mix_hash(unsigned long h, unsigned long x)
 {
-    h ^= x + 0x9e3779b97f4a7c15UL + (h << 6) + (h >> 2);
+    h^=x+HASH_COMBINE_GOLDEN+(h<<6)+(h>>2);
     return h;
 }
 
 static bool file_in_group(const Group* g, const File* f)
 {
-    if (!g || !f) return false;
+    if (!g||!f) return false;
 
     if (cfg.use_md5) {
         if (!f->md5_ready) return false;
@@ -239,6 +272,7 @@ static bool is_dir(const char* path)
     return S_ISDIR(st.st_mode);
 }
 
+/*
 static Vector* create_vector(int n)
 {
     Vector* v=malloc(sizeof(Vector));
@@ -255,6 +289,7 @@ static Vector* create_vector(int n)
     }
     return v;
 }
+*/
 
 static void push_file_vector(Vector* v,File* f)
 {
@@ -300,16 +335,6 @@ static void push_group_vector(Vector_Group* v, Group* g)
 }
 
 static void free_group_vector(Vector_Group* v)
-{
-    if (!v) return;
-    free(v->elements);
-    v->elements=NULL;
-    v->len = 0;
-    v->cap = 0;
-    free(v);
-}
-
-static void free_vector(Vector* v)
 {
     if (!v) return;
     free(v->elements);
@@ -390,7 +415,7 @@ static Group* create_new_group(File* f)
     g->mtime=f->mtime;
     memcpy(g->md5,f->md5,sizeof(g->md5));
     g->next_group=NULL;
-    if (!cfg.use_md5&&f->name) {
+    if ((!(cfg.use_md5)||(cfg.use_md5&&cfg.use_date))&&f->name) {
         //g->name=strdup(f->name);
         size_t l=strlen(f->name);
         g->name=malloc(l+1);
@@ -437,7 +462,7 @@ static void free_hash_table(HashTable* hash_table)
 
 static unsigned long get_hash(const char* name, off_t size, time_t mtime, const unsigned char md5[16], bool md5_ready)
 {
-    unsigned long h=1469598103934665603UL;
+    unsigned long h=HASH_FNV_OFFSET_BASIS;
     if (cfg.use_md5) {
         if (md5_ready) h=mix_hash(h,hash_bytes(md5,16));
         if (cfg.use_date) {
@@ -509,7 +534,7 @@ static void dfs(const char* path,HashTable* hash_table)
             continue;
         }
         struct stat st;
-        if (lstat(abs_path,&st)<0) die_error("Failed lstat");
+        if (lstat(abs_path,&st)<0) continue;
         if (S_ISLNK(st.st_mode)) continue;
         // Is file?
         if (S_ISREG(st.st_mode)) {

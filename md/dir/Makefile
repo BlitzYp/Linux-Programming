@@ -1,5 +1,5 @@
 CC := gcc
-CFLAGS := -std=c99
+CFLAGS := -std=c99 -Wall -Wextra -Wno-deprecated-declarations
 LDLIBS := -lcrypto
 
 BIN := md_dir
