@@ -1,0 +1,25 @@
+Praktiskais darbs #4
+
+Programmu analīze.
+
+Šoreiz nekas pašiem nav jāprogrammē - tā vietā jāanalizē gatavas programmas darbība un kods.
+
+Programmas kods dots šeit. Uzdevumi:
+
+    Kompilēt šo kodu, aizstājot NAME_FIRST_LETTER un SURNAME_FIRST_LETTER programmas kodā ar saviem personīgajiem iniciāļiem. Komanda:
+
+gcc -Wall pd4.c -o pd4
+
+    Palaist šo programmu. Noskaidrot, kādus sistēmas izsaukumus tā lieto. Kāds ir kopējais sistēmas izsaukumu skaits? Kāds konkrēti ir visbiežāk izmantotais sistēmas izsaukums? Kā izskaidrot lielo sistēmas izsaukumu skaitu?
+    Programmas darbības laikā Linux kodols uztur tai atbilstošus failus /proc failu sistēmā. Tie atrodami zem /proc/<pid>/, kur <pid> ir programmas identifikators. Pēc jūsu izvēles, iepazīstieties ar trīs tur atrodamiem failiem (vēlams, lai visiem kursā nebūtu izvēlēti vieni un tie paši.) Kā šie konkrētie faili varētu palīdzēt programmu atkļūdošanai vai kontrolei? (Runājot par kontroli, svarīgi ir tas, ka daži no failiem ir rakstāmi.) Uzrakstiet vienu-divus teikumus par katru. Nav obligāti skaidrot katru failā esošo skaitli, bet aptuveno ideju "kas šajā failā glabājas"!
+    Opcionāls uzdevums papildus vērtējumam: izskaidrot programmas koda rindiņu, sākot no 120 rindiņas līdz 125 rindiņai, nozīmi un lietojumu.
+
+Izmantojamie rīki
+
+    strace utilīta
+    ps utilīta
+    proc failu sistēma (/proc)
+
+Iesūtīšana
+
+Risinājumus iesniegt estudijas.lu.lv (Apraksts PDF failā). 

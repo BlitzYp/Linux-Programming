@@ -117,6 +117,7 @@ int main(int argc,char** argv)
                 File* f=g->files.elements[j];
                 fprintf(stdout,"%s\n",f->path);
             }
+            fprintf(stdout,"\n");
         }
     }
     free_group_vector(groups);
@@ -220,7 +221,7 @@ static bool file_in_group(const Group* g, const File* f)
     if (cfg.use_md5) {
         if (!f->md5_ready) return false;
         if (memcmp(g->md5, f->md5, sizeof(f->md5)) != 0) return false;
-        if (cfg.use_date&&g->mtime!=f->mtime) return false;
+        if (cfg.use_date&&(g->mtime!=f->mtime||strcmp(f->name,g->name)!=0)) return false;
         return true;
     }
 
@@ -439,7 +440,10 @@ static unsigned long get_hash(const char* name, off_t size, time_t mtime, const 
     unsigned long h=1469598103934665603UL;
     if (cfg.use_md5) {
         if (md5_ready) h=mix_hash(h,hash_bytes(md5,16));
-        if (cfg.use_date) h=mix_hash(h,(unsigned long)mtime);
+        if (cfg.use_date) {
+            h=mix_hash(h,(unsigned long)mtime);
+            h=mix_hash(h,hash(name));
+        }
         return h;
     }
     h=mix_hash(h,hash(name));
