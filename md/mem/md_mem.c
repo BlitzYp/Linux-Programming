@@ -217,7 +217,7 @@ int main(int argc, char **argv) {
     printf("Max allocated MiB   : %zu\n", cnt);
     // print sink so compiler doesn't drop it
     printf("Sink: %llu\n", (unsigned long long)sink);
-
+    
     // Note: freeing is not required by assignment.
     // If you want to be nice for malloc/mmap runs, you could free/munmap here,
     // but for "max" tests it can take time and isn't needed.
