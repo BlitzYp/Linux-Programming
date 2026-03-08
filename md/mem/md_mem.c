@@ -43,8 +43,8 @@ static void* alloc_sbrk(size_t n)
 
 int main(int argc, char **argv) 
 {
-    // -t ir priekš touch (allokācija+rakstīt tajā lapā)
-    if ((argc!=2)||!(strcmp(argv[1],"malloc")==0 || strcmp(argv[1],"mmap")==0 || strcmp(argv[1],"sbrk")==0)) {
+    // -t ir priekš touch (alokācija+rakstīt tajā lapā)
+    if ((argc<2)||!(strcmp(argv[1],"malloc")==0 || strcmp(argv[1],"mmap")==0 || strcmp(argv[1],"sbrk")==0)) {
         fprintf(stderr, "Usage: %s <malloc|mmap|sbrk> t\n", argv[0]);
         return -1;
     }
@@ -67,7 +67,6 @@ int main(int argc, char **argv)
         if (!p) break;
         count++;
         if (touch) touch_pages((volatile unsigned char*)p,MB,pagesz);
-
         if (count%256==0) fprintf(stderr,"Allocted MB thus far: %lld\n",count);
     }
 

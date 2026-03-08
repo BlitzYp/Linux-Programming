@@ -7,3 +7,6 @@ test:
 
 test_100:
 	./md_mem_100
+
+clean:
+	rm *.out md_mem md_mem_100
