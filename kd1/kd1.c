@@ -5,7 +5,7 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#define BUF_SIZE 4096
+#define BUF_SIZE 4096 // 4KB ir praktisks bufera izmērs, pietiekami liels ātram IO.
 
 typedef enum {
     XOR,
@@ -13,6 +13,7 @@ typedef enum {
     TRANSLATE
 } Mode;
 
+// Programmas konfigurācija/dati
 typedef struct {
     const char* t_file;
     const char* s_file;
@@ -32,12 +33,13 @@ static int open_output(const char* filename);
 static int init_map(Flags* opt);
 static int write_out(int in_fd, int out_fd);
 static int handle_translate_map(const char* filename);
+static void print_usage(const char* progname);
 
-static void print_usage(const char* progname)
-{
-    fprintf(stderr,"Lietojums: %s [-t translation-file] [-s cypher-table] [-o output-file] [input-file]\n",progname);
-}
-
+/*
+    1. Pārsē ievadu
+    2. Inicializē map atbilstoši izvēlētajam režīmam
+    3. Raksta iztulkoto uz izvadu
+*/
 int main(int argc, char** argv)
 {
     Flags opt={NULL,NULL,NULL,NULL,XOR};
@@ -70,6 +72,10 @@ int main(int argc, char** argv)
     return 0;
 }
 
+static void print_usage(const char* progname)
+{
+    fprintf(stderr,"Lietojums: %s [-t translation-file] [-s cypher-table] [-o output-file] [input-file]\n",progname);
+}
 
 static int parse(int argc, char** argv, Flags* opt)
 {
@@ -125,13 +131,15 @@ static int handle_translate_map(const char* filename)
         fprintf(stderr, "Kluda atverot tulkosanas failu '%s': %s\n", filename, strerror(errno));
         return -1;
     }
+
+    // Nolasa visu translācijas failu statiskajā buferī.
     ssize_t total=0, n;
     while ((n=read(fd,translate_buff+total,BUF_SIZE-total))>0) {
         total+=n;
         if (total==BUF_SIZE) {
             ssize_t tmp=read(fd,&lieks,1);
             if (tmp>0) {
-                fprintf(stderr,"Translācijas fails neietilpst buferī!\n");
+                fprintf(stderr,"Translacijas fails neietilpst buferi!\n");
                 close(fd);
                 return -1;
             }
@@ -145,16 +153,16 @@ static int handle_translate_map(const char* filename)
     }
     close(fd);
     if (total<=0) {
-        fprintf(stderr,"Translācijas fails ir tukšs!\n");
+        fprintf(stderr,"Translacijas fails ir tukss!\n");
         return -1;
     }
 
     // Atdalītājs
     unsigned char atd=translate_buff[0];
-    // simbols tulkojas uz to pašu pagaidām
+    // Sākam ar identitātes karti un tad pārrakstām tikai vajadzīgos simbolus.
     for (int i=0;i<256;i++) map[i]=(unsigned char)i;
 
-    // Atrodam virkņu robežas
+    // Meklējam pirmās virknes beigas, ko atdala tas pats pirmais baits.
     int from_start=1,from_end=-1;
     for (int i=from_start;i<total;i++) {
         if (translate_buff[i]==atd) {
@@ -170,14 +178,14 @@ static int handle_translate_map(const char* filename)
     int to_len=total-to_start,from_len=from_end-from_start; 
 
     if (!(to_len==from_len||to_len==from_len+1)) {
-        fprintf(stderr,"Formāts translacijas failam nav pareizs!(nesakrīt virknes garumi)\n");
+        fprintf(stderr,"Formats translacijas failam nav pareizs!(nesakrit virknes garumi)\n");
         return -1;
     }
 
-    // Šeit mēs noformējam map priekš tulkošanas 
+    // Pirmā virkne satur ko tulkot, otrā uz ko tulkot.
     for (int i=0;i<from_len;i++) map[translate_buff[from_start+i]]=translate_buff[to_start+i];
 
-    // Ja ir papildus simbols otrajā virknē, tad tas ir par ko tulkojas atdalītājs
+    // Papildu baits faila beigās nozīmē paša atdalītāja tulkojumu.
     if (from_len+1==to_len) map[atd]=translate_buff[to_start+from_len];
     return 0; 
 }
@@ -187,6 +195,7 @@ static int init_map(Flags* opt)
     int fd;
     ssize_t total;
     if (opt->m==XOR) {
+        // Noklusētais režīms apgriezts kreisais bits katram baitam.
         for (int i=0; i<256; i++) map[i]=(unsigned char)i^0x80;
         return 0;
     }
@@ -197,6 +206,7 @@ static int init_map(Flags* opt)
             return -1;
         }
 
+        // Šifrēšanas fails ir gatava 256 baitu tabula.
         total=read(fd,map,256);
         if (total<0) {
             fprintf(stderr, "Kluda lasot sifresanas failu '%s': %s\n", opt->s_file, strerror(errno));
@@ -204,15 +214,15 @@ static int init_map(Flags* opt)
             return -1;
         }
         if (total!=256) { 
-            fprintf(stderr, "Kluda! Cypher tabulai jabūt 256 baitiem!\n");
+            fprintf(stderr, "Kluda! Cypher tabulai jabut 256 baitiem!\n");
             close(fd);
             return -1;
         }
 
-        // Ja fails ir lielāks par 256, tad arī kļūda
+        // Ja fails ir lielāks par 256, tad arī kļūda.
         total=read(fd,&lieks,1);
         if (total<0||total!=0) {
-            fprintf(stderr, "Kluda! Cypher tabulai jabūt 256 baitiem!\n");
+            fprintf(stderr, "Kluda! Cypher tabulai jabut 256 baitiem!\n");
             close(fd);
             return -1;
         }
@@ -253,8 +263,10 @@ static int write_out(int in_fd, int out_fd)
 {
     ssize_t n,written,total;
     while ((n=read(in_fd, buff, BUF_SIZE))>0) {
-
+        // Katru ievades baitu aizstāj ar atbilstošo vērtību no map.
         for (ssize_t i=0;i<n;i++) buff[i]=map[buff[i]];
+
+        // write var izrakstīt tikai daļu bufera, tāpēc rakstām ciklā.
         total=0;
         while (total<n) {
             written=write(out_fd,buff+total,n-total);
