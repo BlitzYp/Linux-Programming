@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -54,7 +53,7 @@ int main(int argc, char** argv)
 
     in_fd=open_input(opt.input_file);
     if (in_fd<0) return 1;
-   
+
     out_fd=open_output(opt.o_file);
     if (out_fd<0) {
         if (in_fd!=STDIN_FILENO) close(in_fd);
@@ -124,7 +123,7 @@ static int parse(int argc, char** argv, Flags* opt)
     return 0;
 }
 
-static int handle_translate_map(const char* filename) 
+static int handle_translate_map(const char* filename)
 {
     int fd=open(filename,O_RDONLY);
     if (fd<0) {
@@ -175,7 +174,7 @@ static int handle_translate_map(const char* filename)
         return -1;
     }
     int to_start=from_end+1;
-    int to_len=total-to_start,from_len=from_end-from_start; 
+    int to_len=total-to_start,from_len=from_end-from_start;
 
     if (!(to_len==from_len||to_len==from_len+1)) {
         fprintf(stderr,"Formats translacijas failam nav pareizs!(nesakrit virknes garumi)\n");
@@ -187,7 +186,7 @@ static int handle_translate_map(const char* filename)
 
     // Papildu baits faila beigās nozīmē paša atdalītāja tulkojumu.
     if (from_len+1==to_len) map[atd]=translate_buff[to_start+from_len];
-    return 0; 
+    return 0;
 }
 
 static int init_map(Flags* opt)
@@ -213,7 +212,7 @@ static int init_map(Flags* opt)
             close(fd);
             return -1;
         }
-        if (total!=256) { 
+        if (total!=256) {
             fprintf(stderr, "Kluda! Cypher tabulai jabut 256 baitiem!\n");
             close(fd);
             return -1;
@@ -231,7 +230,7 @@ static int init_map(Flags* opt)
     }
     if (opt->m==TRANSLATE) {
         if (handle_translate_map(opt->t_file)!=0) return -1;
-    } 
+    }
     return 0;
 }
 
