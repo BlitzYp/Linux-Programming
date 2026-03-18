@@ -1,0 +1,12 @@
+PD_Thread
+Uzdevums
+
+Programma kas taisa N pavedienus, kur katrs izdrukā M burtus.
+
+N un M ir parametri. Drukājamais burts ir katram pavedienam atšķirīgs.
+
+Testēt un novērot gan kādā kārtībā burti tiek drukāti, gan kopējo burtu skaitu.
+
+Secinājumus ievietot failā secinajumi.txt
+
+Pirmkoda un secinājumu failus iesūtīt estudijās kā PD_Thread.

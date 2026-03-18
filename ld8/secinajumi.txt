@@ -1,0 +1,11 @@
+Programma izveido N pavedienus, un katrs pavediena izdrukā attiecīgo burtu M reizes. Kopējais izdrukāto burtu skaits ir N*M.
+Testējot programmu, var novērot, ka burtu drukāšanas secība nav garantēta.
+Pavedieni darbojas paralēli vienā procesā, tāpēc dažādos palaišanas brīžos izdruka var atšķirties.
+
+Manā gadījumā bieži burti tika izdrukāti grupās, piemēram:
+AAAA BBBB CCCC ...
+taču citos apstākļos tie var sajaukties citādā secībā. Pavedienu izpildes kārtību nosaka operētājsistēmas plānotājs.
+Tāpēc nevar paredzēt, kurš pavediens izpildīsies pirmais.
+Ja gribētu sinhronizēt pavedienu piekļuvi izvadei, varētu izmantot mutex. Kodā ir iekomentēts, kā tas varētu izskatīties.
+
+Secinājums: daudzpavedienu programmās rezultātu secība var nebūt vienāda katrā izpildes reizē, bet kopējais izdrukāto simbolu skaits paliek pareizs, ja visi pavedieni tiek korekti pabeigti ar pthread_join.
