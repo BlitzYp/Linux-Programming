@@ -1,0 +1,51 @@
+PD#10: Starprocesu komunikācija
+Vienkāršāki socketi
+
+Kursa projektā izmantosim socketus zemākā līmenī, bet šoreiz priekš PD10 varat izmantot ērtāku risinājumu:
+
+    funkcija socketpair() noņem sarežģītību veidojot sockets
+        atgriež pāri ar socketiem, ko var lietot līdzīgi kā pipe, lietojot fork()
+        katrs no procesiem aizver nevajadzīgo faila deskriptoru
+        Šie ir anonīmi socketi - tie neparādās ārpus procesiem un tiem nevar pieslēgties caur tīkla adresi. Tie izmanto domēna adreses/faila mehānismu, un loģiski nav derīgi socket savienojumam starp atsevišķiem datoriem tīklā.
+
+
+Uzdevums
+
+Realizēt komunikāciju starp parent un child progammām ar socket palīdzību.
+
+Parent process padod child procesam ASCII rindiņu, kura satur divus skaitļus.
+
+Child process rindiņu nolasa (piemēram, ar scanf funkciju), saskaita skatļus, izvada rezultātu (kā ASCII rindiņu) atpakaļ parentam.
+
+Koda šablons:
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int main(void)
+{
+    int ret = socketpair(AF_UNIX, SOCK_STREAM, 0, sock);
+    if (ret) {
+	perror("socketpair");
+	return 1;
+    }
+
+
+    // fork
+
+    // in parent code: write to socket, wait for reply, read it, and output it
+
+
+    // in child code: read from socket, process arguments, write reply, exit
+
+    return 0;
+}
+
+Padomi
+
+    Izmantot funkciju fork().
+    Izmantot funkciju socketpair().
